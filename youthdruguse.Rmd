@@ -1,0 +1,708 @@
+---
+title: "homework1"
+output: html_document
+date: "2023-04-06"
+---
+```{r}
+library(tidyverse)
+```
+
+```{r}
+load('~/DATA 5322/youth_data.rdata')
+#column names for dataframe
+attr(df,'var.labels')
+```
+```{r}
+#data frame 
+df <- na.omit(df)
+df
+```
+```{r}
+print(class(df$tobflag))
+```
+
+#Binary classification: Has or has not used cigs 
+
+```{r}
+#variable for specifically whether has used cigs or not and changing it to no:0 or yes:1
+tobflag <- df$tobflag
+tobflag
+```
+
+```{r}
+#use demographics as a factor 
+demographic_cols
+```
+
+```{r}
+#selecting the demographic columns 
+df_demog <- df %>% select(demographic_cols)
+df_demog
+```
+
+Cleaning the demographic data frame and ommiting an NAs
+```{r}
+
+df_demo_clean <- df_demog%>%
+  mutate(irsex = factor(irsex, levels = c(1,2),labels = c('male','female')),
+         NEWRACE2 = factor(NEWRACE2, levels = c(1,2,3,4,5,6,7), labels = c("NonHisp White","NonHisp Black/Afr Am","NonHisp Native Am/AK Native","NonHisp Native HI/Other Pac Isl","NonHisp Asian","NonHisp more than one race","Hispanic")),
+         HEALTH2 = factor(HEALTH2, levels = c(1,2,3,4), labels = c("Excellent","Very Good","Good","Fair/Poor"),ordered=TRUE),
+         eduschlgo = factor(eduschlgo, levels = c(1,2),labels = c("Yes","No")),
+         EDUSCHGRD2 = factor(EDUSCHGRD2, levels = c(1,2,3,4,5,6,7,8,9,10,11,98,99), labels = c("5th Grade or lower","6th Grade","7th Grade","8th Grade","9th Grade","10th Grade","11th Grade","12th Grade","College or university/1st year","College or university/2nd Year, 3rd year"," College or university/4th Year, 5th or higher year","BLANK (NO ANSWER)","LEGITIMATE SKIP"),ordered=TRUE),
+         eduskpcom = factor(eduskpcom, levels = c(0:30,94,97,98,99),labels = c(0:30, "No Answer", "No Answer", "No Answer", "No Answer")),
+         imother = factor(imother, levels = c(1,2,3,4), labels = c("Yes","No","Don't know","Over 18")),
+         ifather = factor(ifather, levels = c(1,2,3,4), labels = c("Yes","No","Don't know","Over 18")),
+         income = factor(income, levels = c(1,2,3,4), labels = c("Less than $20,000","$20,000 - $49,999","$50,000 - $74,999","$75,000 or More"),ordered=TRUE),
+         govtprog = factor(govtprog, levels = c(1,2), labels =c("Yes","No")),
+         POVERTY3 = factor(POVERTY3, levels = c(1,2,3), labels = c("Living in Poverty","Income Up to 2X Fed Pov Thresh"," Income More Than 2X Fed Pov Thresh"),ordered=TRUE),
+         PDEN10 = factor(PDEN10, levels = c(1,2,3), labels = c(">1M people","<1M people","Can't be determined")),
+         COUTYP4 = factor(COUTYP4, levels = c(1,2,3), labels = c("Large metro","Small metro","Nonmetro")))
+df_demo_clean
+```
+
+```{r}
+# Replace 94, 97, 98, 99 with NA
+#df_demo_clean$eduskpcom[df_demo_clean$eduskpcom %in% c(94, 97, 98, 99)] <- "No answer"
+
+# Create factor variable with correct levels
+#df_demo_clean$eduskpcom <- factor(df_demo_clean$eduskpcom, levels = 0:30,
+                             #labels = c("0 days", "1 day", "2 days", "3 days",
+                                       # "4 days", "5 days", "6 days", "7 days",
+                                       # "8 days", "9 days", "10 days", "11 days",
+                                      #  "12 days", "13 days", "14 days", "15 days",
+                                      #  "16 days", "17 days", "18 days", "19 days",
+                                      #  "20 days", "21 days", "22 days", "23 days",
+                                     #   "24 days", "25 days", "26 days", "27 days",
+                                     #   "28 days", "29 days", "30 days"))
+#df_demo_clean
+```
+
+```{r}
+
+```
+
+
+
+
+cleaned ver:
+```{r}
+df.cig2 <- cbind(tobflag,df_demo_clean)
+#removing any Nas from data set 
+df.cig2 <- na.omit(df.cig2)
+df.cig2
+```
+```{r}
+#df.cig2 <- df.cig2%>%
+  #mutate(tobflag = factor(tobflag, levels = c(0, 1), labels = c('No', 'Yes')))
+#df.cig2
+```
+
+
+```{r}
+sapply(df.cig2, function(x) if(is.factor(x)) nlevels(x) else NA)
+```
+
+```{r}
+tree.cig2 <- tree(tobflag ~ ., df.cig2)
+tree.cig2
+```
+
+
+```{r}
+#training and test data with cigs and demographics
+set.seed(1)
+train <- sample(1:nrow(df.cig2), 1000)
+cig.train <- df.cig2[train,]
+cig.test <- df.cig2[-train,]
+```
+
+
+```{r}
+tree.cig <- tree(tobflag ~ ., df.cig2, subset = train)
+summary(tree.cig)
+```
+```{r}
+library(ggplot2)
+plot(tree.cig)
+text(tree.cig, pretty = 0)
+```
+```{r}
+tree.cig
+```
+
+```{r}
+set.seed(1)
+test <- df.cig2$tobflag[-train]
+tree.pred <- predict(tree.cig, cig.test,
+    type = "class")
+table <- table(tree.pred, test)
+table
+mean(tree.pred == test)
+accuracy_Test <- sum(diag(table)) / sum(table)
+print(paste('Accuracy for test', accuracy_Test))
+```
+score of 89 percent for the test set. 
+
+Let's try pruning the tree:
+
+```{r}
+set.seed(123)
+tree.cig <- tree(tobflag ~ ., df.cig2, subset = train)
+cv.cig <- cv.tree(tree.cig,K= 5,FUN = prune.tree)
+optimal_K <- which.min(cv.cig$dev)
+pruned_tree <- prune.tree(tree.cig, best = optimal_K)
+```
+
+```{r}
+# Plot cross-validation results
+par(mfrow = c(1, 2))
+plot(cv.cig$size, cv.cig$dev, type = "b", xlab = "Number of terminal nodes", ylab = "Cross-validation error rate", main = "Cross-validation results")
+abline(v = optimal_K, lty = 2)
+```
+```{r}
+# Plot pruned decision tree with appropriate labels
+plot(pruned_tree, main = "Pruned Decision Tree")
+text(pruned_tree, cex = 0.6, pretty = 0)
+```
+```{r}
+pruned_tree
+```
+
+```{r}
+summary(pruned_tree)
+set.seed(1)
+test <- df.cig2$tobflag[-train]
+tree.pred <- predict(pruned_tree, cig.test,
+    type = "class")
+table <- table(tree.pred, test)
+table
+mean(tree.pred == test)
+accuracy_Test <- sum(diag(table)) / sum(table)
+print(paste('Accuracy for test', accuracy_Test))
+yhat <- predict(pruned_tree, cig.test)
+yhat.boost.num <- as.numeric(as.character(yhat))
+cig.test.num <- as.numeric(as.character(test))
+mean((yhat.boost.num - cig.test.num)^2)
+#mean((yhat - test)^2)
+```
+```{r}
+df.cig2
+```
+
+Boosting:
+```{r}
+print(class(df.cig2$tobflag))
+```
+
+```{r}
+set.seed(1)
+train <- sample(1:nrow(df.cig2), 1000)
+cig.train <- df.cig2[train,]
+cig.test <- df.cig2[-train,]
+boost.cig <- gbm(tobflag ~ .- eduschlgo, data = df.cig2[train, ],
+    distribution = "gaussian", n.trees = 100,
+    interaction.depth = 4)
+summary(boost.cig)
+```
+We can see that the variables that are the most important are eduskpcom and EDUSCHGRD2
+
+
+```{r}
+yhat.boost <- predict(boost.cig,
+    newdata = df.cig2[-train, ], n.trees = 50)
+yhat.boost.num <- as.numeric(as.character(yhat.boost))
+cig.test.num <- as.numeric(as.character(test))
+mean((yhat.boost.num - cig.test.num)^2)
+```
+We get a MSE of 1.07 
+
+changing tobflag to yes and no :
+```{r}
+#df.cig2 <- df.cig2%>%
+ # mutate(tobflag = factor(tobflag, levels = c(0, 1), labels = c('No', 'Yes')))
+#df.cig2
+```
+
+
+```{r}
+# fix variable label metadata to only include the selected columns
+new_labels <- attr(df,'var.labels')[match(names(df.cig2), attr(df,'names'))]
+attr(df.cig2,'var.labels') <- new_labels
+attr(df.cig2,'var.labels')
+```
+
+renaming the columns so i can create a nicer plot:
+```{r}
+#names(df.cig2) <- new_labels
+#df.cig2
+```
+
+Multi-class classification
+
+differentiate between seldom, sometimes, and frequent marijuana use:
+
+'mrjydays', # number of days of marijuana in past year (1-5 categories, 6=none)
+```{r}
+#RC-# OF DAYS USED MARIJUANA IN PAST YEAR
+#mrjydays <- df$mrjydays
+# create a new factor variable with the specified levels and labels
+mrjydays <- factor(df$mrjydays,
+                          levels = c(1, 2, 3, 4, 5, 6),
+                          labels = c("1-11 Days", "12-49 Days", "50-99 Days", "100-299 Days", "300-365 Days", "Non User or No Past Year Use"))
+
+# convert the new variable to a factor
+mrjydays <- factor(mrjydays)
+#mrjydays 
+```
+
+```{r}
+#selecting the youth experience cols 
+df_youth <- df %>% select(schfelt:rlgfrnd) # use all youth questions, start with schfelt and go through rlgfrnd
+df_youth
+```
+```{r}
+df_youth_m <- subset(df_youth, select = c("schfelt", "tchgjob","avggrade","stndsmj","parlmtsn","PRMJEVR2","YFLTMRJ2","FRDMEVR2","talkprob","PRTALK3","DRPRVME3","ANYEDUC3"))
+df_youth_m
+```
+```{r}
+
+```
+
+
+```{r}
+#sapply(df_youth_m, function(x) if(is.factor(x)) nlevels(x) else NA)
+```
+
+cleaning dataset :
+
+```{r}
+df_youth_clean_m <- df_youth_m %>%
+  mutate(schfelt = factor(schfelt, levels = c(1,2), 
+                           labels = c("Liked A Lot/Kind of Liked","Didn't Like Very Much/Hated"))) %>%
+  mutate(tchgjob = factor(tchgjob, levels = c(1,2),
+                           labels = c("Always/Sometimes","Seldom/Never"))) %>%
+  mutate(avggrade = factor(avggrade, levels = c(1,2),
+                            labels = c("D or Lower","A, B, or C"))) %>%
+  mutate(stndsmj = factor(stndsmj, levels = c(1,2),
+                           labels = c("Most/All","None/Few"))) %>%
+  mutate(parlmtsn = factor(parlmtsn, levels = c(1,2),
+                           labels = c("Always/Sometimes","Seldom/Never"))) %>%
+  mutate(PRMJEVR2 = factor(PRMJEVR2, levels = c(1,2),
+                           labels = c("Strongly Disapprove","Somewhat Disapprove or Neither"))) %>%
+  mutate(YFLTMRJ2 = factor(YFLTMRJ2, levels = c(1,2),
+                           labels = c("Strongly/Somewhat Disapprove","Neither Approve Nor Disapprove"))) %>%
+  mutate(FRDMEVR2 = factor(FRDMEVR2, levels = c(1,2),
+                           labels = c("Strongly/Somewhat Disapprove","Neither Approve Nor Disapprove"))) %>%
+  mutate(talkprob = factor(talkprob, levels = c(1,2),
+                           labels = c("No one","Someone"))) %>%
+  mutate(PRTALK3 = factor(PRTALK3, levels = c(1,2),
+                           labels = c("Yes","No"))) %>%
+  mutate(DRPRVME3 = factor(DRPRVME3, levels = c(1,2),
+                           labels = c("Yes","No"))) %>%
+  mutate(ANYEDUC3 = factor(ANYEDUC3, levels = c(1,2),
+                           labels = c("Yes","No")))
+df_youth_clean_m
+```
+Dataset combining mrjydays and youth experiences:
+```{r}
+df.ma <- cbind(mrjydays,df_youth_clean_m)
+df.ma
+#removing any Nas from data set 
+df.ma <- na.omit(df.ma)
+df.ma
+```
+
+```{r}
+set.seed(1)
+#train <- sample(1:nrow(df.ma), 1000)
+train <- sample(1:nrow(df.ma), nrow(df.ma) / 2)
+test <- df.ma[-train,"mrjydays"]
+bag.ma <- randomForest(mrjydays ~ ., df.ma, subset = train, mtry = 12, importance = TRUE)
+bag.ma
+```
+This confusion matrix represents the performance of the multi-class classification model in predicting marijuana use categories for the test data set. The matrix displays the actual and predicted categories in a tabular format. The diagonal elements of the matrix show the number of correct predictions for each category, while the off-diagonal elements represent the number of misclassifications.
+
+For example, the first row and first column indicate that 23 individuals who reported using marijuana 1-11 days in the past year were correctly classified as such, while five of them were misclassified as using marijuana 12-49 days, two were misclassified as using marijuana 50-99 days, 12 were misclassified as using marijuana 100-299 days, three were misclassified as using marijuana 300-365 days, and 70 were misclassified as non-users or not having used marijuana in the past year.
+```{r}
+library(ggplot2)
+library(reshape2)
+
+# Convert confusion matrix to data frame
+cm_df <- as.data.frame(table(Predicted = predict(bag.ma, newdata = df.ma[-train, ]), 
+                             Actual = test))
+
+# Plot confusion matrix
+ggplot(data = cm_df, aes(x = Actual, y = Predicted, fill = Freq)) +
+  geom_tile() +
+  geom_text(aes(label = Freq), color = "black", size = 10) +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  labs(x = "Actual", y = "Predicted", fill = "Frequency") +
+  theme_minimal()
+
+```
+```{r}
+yhat.bag <- predict(bag.ma, newdata = df.ma[-train, ])
+yhat.bag.num <- as.numeric(yhat.bag)
+test.num <- as.numeric(test)
+
+# Check for any non-numeric values in yhat.bag.num or test.num
+any(!is.na(yhat.bag.num) & !is.numeric(yhat.bag.num))
+any(!is.na(test.num) & !is.numeric(test.num))
+
+# Calculate the mean squared error
+mean((yhat.bag.num - test.num)^2)
+
+
+```
+The test set MSE associated with the bagged classification is 2.37
+
+```{r}
+importance(bag.ma)
+varImpPlot(bag.ma)
+```
+
+```{r}
+plot(bag.ma)
+```
+```{r}
+set.seed(1)
+rf.ma <- randomForest(mrjydays ~ ., df.ma, subset = train, mtry = 6, importance = TRUE)
+yhat.rf <- predict(rf.ma, newdata = df.ma[-train, ])
+yhat.rf.num <- as.numeric(yhat.rf)
+test.num2 <- as.numeric(test)
+
+# Check for any non-numeric values in yhat.bag.num or test.num
+any(!is.na(yhat.rf.num) & !is.numeric(yhat.rf.num))
+any(!is.na(test.num2) & !is.numeric(test.num2))
+
+# Calculate the mean squared error
+mean((yhat.rf.num - test.num2)^2)
+```
+we get MSE 2.16 which is lower than the previous which indicates that random forests yielded an improvement over bagging in this case.
+
+```{r}
+importance(rf.ma)
+```
+```{r}
+varImpPlot(rf.ma)
+```
+PRMJEVR2 and FRDMEVR2 are the more important variables.
+
+```{r}
+#training and test data with marj and youth experiences 
+set.seed(1)
+train <- sample(1:nrow(df.ma), 2000)
+ma.train <- df.ma[train,]
+ma.test <- df.ma[-train,]
+```
+
+```{r}
+tree.ma <- tree(mrjydays ~ ., ma.train)
+summary(tree.ma)
+```
+training error of 12%
+```{r}
+tree.ma
+```
+
+```{r}
+plot(tree.ma)
+text(tree.ma, cex = 0.6,pretty = 0)
+```
+```{r}
+tree.ma
+```
+
+```{r}
+set.seed(1)
+test <- df.ma$mrjydays[-train]
+tree.pred <- predict(tree.ma, ma.test,
+    type = "class")
+table <- table(tree.pred, test)
+table
+mean(tree.pred == test)
+accuracy_Test <- sum(diag(table)) / sum(table)
+print(paste('Accuracy for test', accuracy_Test))
+```
+
+Next, we consider whether pruning the tree might lead to improved results. The function cv.tree() performs cross-validation in order to determine the optimal level of tree complexity; cost complexity pruning is used in order to select a sequence of trees for consideration. We use the argument FUN = prune.misclass in order to indicate that we want the classification error rate to guide the cross-validation and pruning process, rather than the default for the cv.tree() function, which is deviance. The cv.tree() function reports the number of terminal nodes of each tree considered (size) as well as the corresponding error rate and the value of the cost-complexity parameter used (k, which corresponds to α
+ in (8.4)).
+
+```{r}
+set.seed(7)
+cv.ma <- cv.tree(tree.ma, FUN = prune.tree)
+names(cv.ma)
+```
+```{r}
+cv.ma
+```
+
+```{r}
+par(mfrow = c(1, 2))
+plot(cv.ma$size, cv.ma$dev, type = "b")
+plot(cv.ma$k, cv.ma$dev, type = "b")
+```
+```{r}
+optimal_K <- which.min(cv.ma$dev)
+prune.ma <- prune.tree(tree.ma, best = optimal_K)
+plot(prune.ma)
+text(prune.ma,cex = 0.6, pretty = 0)
+```
+```{r}
+tree.pred <- predict(prune.ma, ma.test,
+    type = "class")
+table(tree.pred, test)
+mean(tree.pred == test)
+accuracy_Test <- sum(diag(table)) / sum(table)
+print(paste('Accuracy for test', accuracy_Test))
+```
+Accuracy stays the same so pruning really doesnt change the performance in this case. 
+
+```{r}
+new_labels <- attr(df,'var.labels')[match(names(df.ma), attr(df,'names'))]
+attr(df.ma,'var.labels') <- new_labels
+attr(df.ma,'var.labels')
+```
+
+potential new thingy model using the above and also demographics bc maybe itll be pog
+
+```{r}
+df.ma2 <- cbind(mrjydays,df_youth_clean_m, df_demo_clean)
+#df.ma2
+#removing any Nas from data set 
+df.ma2 <- na.omit(df.ma2)
+df.ma2
+```
+```{r}
+#training and test data with marj and youth experiences 
+set.seed(1)
+train <- sample(1:nrow(df.ma2), 1000)
+ma.train <- df.ma2[train,]
+ma.test <- df.ma2[-train,]
+```
+```{r}
+tree.ma2 <- tree(mrjydays ~ ., ma.train)
+summary(tree.ma2)
+```
+```{r}
+plot(tree.ma2)
+text(tree.ma2, cex = 0.6,pretty = 0)
+```
+Accuracy:
+```{r}
+set.seed(1)
+test <- df.ma2$mrjydays[-train]
+tree.pred <- predict(tree.ma2, ma.test,
+    type = "class")
+table <- table(tree.pred, test)
+table
+mean(tree.pred == test)
+accuracy_Test <- sum(diag(table)) / sum(table)
+print(paste('Accuracy for test', accuracy_Test))
+```
+```{r}
+set.seed(123)
+tree.ma2 <- tree(mrjydays ~ ., ma.train)
+cv.ma <- cv.tree(tree.ma2, FUN = prune.misclass)
+optimal_K <- which.min(cv.ma$dev)
+pruned.ma <- prune.misclass(tree.ma2, best = optimal_K)
+
+# Plot the pruned tree
+plot(pruned.ma)
+text(pruned.ma, pretty = 0)
+
+```
+```{r}
+plot(pruned.ma)
+text(pruned.ma,cex = 0.4, pretty = 0)
+pruned.ma
+```
+```{r}
+set.seed(1)
+test <- df.ma2$mrjydays[-train]
+tree.pred <- predict(pruned.ma, ma.test,
+    type = "class")
+table <- table(tree.pred, test)
+table
+mean(tree.pred == test)
+accuracy_Test <- sum(diag(table)) / sum(table)
+print(paste('Accuracy for test', accuracy_Test))
+```
+
+
+```{r}
+# Unpruned tree
+summary(tree.ma2)
+
+# Pruned tree
+summary(pruned.ma)
+
+```
+
+Bagging method:
+```{r}
+set.seed(1)
+#train <- sample(1:nrow(df.ma), 1000)
+train <- sample(1:nrow(df.ma2), nrow(df.ma2) / 2)
+test <- df.ma2[-train,"mrjydays"]
+bag.ma <- randomForest(mrjydays ~ ., df.ma2, subset = train, mtry = 25, importance = TRUE)
+bag.ma
+```
+```{r}
+yhat.bag <- predict(bag.ma, newdata = df.ma2[-train, ])
+yhat.bag.num <- as.numeric(yhat.bag)
+test.num <- as.numeric(test)
+
+# Check for any non-numeric values in yhat.bag.num or test.num
+any(!is.na(yhat.bag.num) & !is.numeric(yhat.bag.num))
+any(!is.na(test.num) & !is.numeric(test.num))
+
+# Calculate the mean squared error
+mean((yhat.bag.num - test.num)^2)
+```
+```{r}
+importance(bag.ma)
+```
+
+```{r}
+importance(bag.ma)
+varImpPlot(bag.ma)
+```
+```{r}
+set.seed(1)
+rf.ma <- randomForest(mrjydays ~ ., df.ma2, subset = train, mtry = 12, importance = TRUE)
+yhat.rf <- predict(rf.ma, newdata = df.ma2[-train, ])
+yhat.rf.num <- as.numeric(yhat.rf)
+test.num2 <- as.numeric(test)
+
+# Check for any non-numeric values in yhat.bag.num or test.num
+any(!is.na(yhat.rf.num) & !is.numeric(yhat.rf.num))
+any(!is.na(test.num2) & !is.numeric(test.num2))
+
+# Calculate the mean squared error
+mean((yhat.rf.num - test.num2)^2)
+```
+significantly lower meaning randomforest did better:
+```{r}
+importance(rf.ma)
+```
+
+```{r}
+var_imp <- varImpPlot(rf.ma, main = "Variable Importance Plot for Marijuana use",cex = 0.7)
+#var_imp[[1]]$names <- c("Youth think close friends feel about m ","Youth feels about peers trying m")
+```
+
+
+
+
+
+
+
+regression (e.g. how many days per year a person has used alcohol):
+
+```{r}
+# assume you have a dataframe called "df" with the IRALCFY column
+
+# convert IRALCFY to factor with 3 levels: "Never Used Alcohol", "Used Alcohol Past Year", "Did Not Use Alcohol Past Year"
+iralcfy<- factor(ifelse(df$iralcfy == 991, "Never Used Alcohol", 
+                             ifelse(df$iralcfy == 993, "Did Not Use Alcohol Past Year", 
+                                    "Used Alcohol Past Year")), 
+                            levels = c("Never Used Alcohol", "Used Alcohol Past Year", "Did Not Use Alcohol Past Year"))
+
+iralcfy <- ifelse(iralcfy == "Never Used Alcohol", 0,
+                          ifelse(iralcfy == "Used Alcohol Past Year", 1,
+                                 ifelse(iralcfy == "Did Not Use Alcohol Past Year", 2, NA)))
+iralcfy
+```
+combining alc with youth experiences and demograhics 
+
+
+```{r}
+df.al <- cbind(iralcfy,df_demo_clean)
+df.al
+#removing any Nas from data set 
+df.al <- na.omit(df.al)
+df.al
+```
+
+Regression:
+```{r}
+set.seed(1)
+train <- sample(1:nrow(df.al), 1000)
+#train <- sample(1:nrow(df.al), nrow(df.al) / 2)
+tree.al <- tree(iralcfy ~ ., df.al, subset = train)
+summary(tree.al)
+```
+```{r}
+tree.al
+```
+
+
+```{r}
+plot(tree.al)
+text(tree.al,cex = 0.6, pretty = 0)
+```
+
+cross validation and pruning:
+```{r}
+#cv.al <- cv.tree(tree.al,K=5,FUN = prune.tree)
+#par(mfrow = c(1, 2))
+#plot(cv.al$size, cv.al$dev, type = "b")
+#plot(cv.al$k, cv.al$dev, type = "b")
+
+set.seed(7)
+tree.al <- tree(iralcfy ~ ., df.al, subset = train)
+cv.al <- cv.tree(tree.al,K=5,FUN = prune.tree)
+optimal_K <- which.min(cv.ma$dev)
+pruned.ma <- prune.tree(tree.al, best = optimal_K)
+
+# Plot the pruned tree
+plot(pruned.ma)
+text(pruned.ma,cex = 0.6, pretty = 0)
+```
+```{r}
+summary(pruned.ma)
+```
+
+
+In this case, the most complex tree under consideration is selected by cross-validation. However, if we wish to prune the tree, we could do so as follows, using the prune.tree() function:
+```{r}
+optimal_K <- which.min(cv.al$dev)
+prune.al <- prune.tree(tree.al, best = optimal_K)
+plot(prune.al)
+text(prune.al,cex = 0.6, pretty = 0)
+```
+```{r}
+yhat <- predict(tree.al, newdata = df.al[-train, ])
+al.test <- df.al[-train, "iralcfy"]
+plot(yhat, al.test)
+abline(0, 1)
+```
+```{r}
+mean((yhat - al.test)^2)
+```
+In other words, the test set MSE associated with the regression tree is .29
+```{r}
+sqrt(.2970049)
+```
+
+. The square root of the MSE is therefore around 0.5449816
+indicating that this model leads to test predictions that are (on average) within 0.5449816 so close to 1 of using alc in the past year. 
+Ensemble method: boosting:
+
+```{r}
+set.seed(1)
+boost.al <- gbm(iralcfy ~ .-eduschlgo, data = df.al[train, ],
+    distribution = "gaussian", n.trees = 2000,
+    interaction.depth = 4)
+summary(boost.al)
+```
+```{r}
+yhat.boost <- predict(boost.al,
+    newdata = df.al[-train, ], n.trees = 2000)
+mean((yhat.boost - al.test)^2)
+```
+we get a MSE of .34 which performed better than the regression tree process. 
+
+
+
